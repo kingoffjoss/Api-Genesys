@@ -1,11 +1,11 @@
 // ==UserScript==
-// @name         Gerenciador de Conversas com Cronômetro e Numeração
-// @namespace    http://seu-dominio.com.br/ (pode ser o seu site, ou deixar como está)
-// @version      1.0
-// @description  Adiciona cronômetros e numeração dinâmica a conversas em plataforma web.
-// @author       Seu Nome (ou Gemini)
-// @match        https://apps.sae1.pure.cloud/directory/#/activity* // <<< MUITO IMPORTANTE: SUBSTITUA PELA URL REAL DA SUA PLATAFORMA!
-// @grant        none
+// @name          Gerenciador de Conversas com Cronômetro e Numeração
+// @namespace     http://seu-dominio.com.br/ (pode ser o seu site, ou deixar como está)
+// @version       1.8 // Versão atualizada: Número da conversa alinhado mais à direita
+// @description   Adiciona cronômetros e numeração dinâmica a conversas em plataforma web, com formato de tempo simplificado e menor, e símbolo de checkmark estilizado quando concluído. O número da conversa permanece visível e alinhado ao cronômetro.
+// @author        Seu Nome (ou Gemini)
+// @match         https://apps.sae1.pure.cloud/directory/#/activity* // <<< MUITO IMPORTANTE: SUBSTITUA PELA URL REAL DA SUA PLATAFORMA!
+// @grant         none
 // ==/UserScript==
 
 (function() {
@@ -13,23 +13,39 @@
     const limitTimeMs = 70 * 1000;
     const updateIntervalMs = 10;
     const formatTime = num => String(num).padStart(2, '0');
-    const formatMilliseconds = num => String(Math.floor(num / 10)).padStart(2, '0');
 
-    const runningBgColor = 'rgba(0, 0, 0, 0.8)';
-    const runningTextColor = 'lime';
+    // Estilos para o cronômetro e número da conversa
+    const runningBgColor = 'rgba(255, 255, 255, 0.9)';
+    const runningTextColor = 'black';
+    const runningBorderColor = '#ccc';
+    const runningBoxShadow = '0 1px 3px rgba(0,0,0,0.1)';
 
-    const pausedBgColor = 'rgba(0, 0, 0, 0.8)';
+    const timerFontSize = '12px';
+    const timerPadding = '2px 5px';
+    const timerBorderRadius = '3px';
+
+    const pausedBgColor = 'rgba(255, 255, 255, 0.9)';
     const pausedTextColor = 'red';
+    const pausedBorderColor = '#ccc';
+    const pausedBoxShadow = '0 1px 3px rgba(0,0,0,0.1)';
 
-    const completedBgColor = 'rgba(255, 0, 0, 0.8)';
-    const completedTextColor = 'white';
-    const completedText = 'INTERAÇÃO CONCLUÍDA';
-    const completedFontSize = '8px';
+    const completedBgColor = 'rgba(0, 0, 0, 1)'; // Fundo preto sólido
+    const completedTextColor = 'lime'; // Cor verde para o checkmark
+    const completedText = '✓';
+    const completedFontSize = '20px';
+    const completedPadding = '0px';
+    const completedBorderRadius = '5px';
 
-    const numberBgColor = 'rgba(0, 0, 0, 0.8)';
-    const numberTextColor = 'white';
-    const numberFontSize = '14px';
-    const numberRightPosition = '15px';
+    const numberBgColor = runningBgColor;
+    const numberTextColor = runningTextColor;
+    const numberBorderColor = runningBorderColor;
+    const numberBoxShadow = runningBoxShadow;
+    const numberFontSize = '12px';
+    const numberPadding = '2px 5px';
+    const numberBorderRadius = '3px';
+
+    // ALTERAÇÃO AQUI: Ajusta a posição à direita para alinhar com o cronômetro
+    const numberRightPosition = '5px'; // Reduzido de 15px para 5px (mesma do cronômetro)
     const numberTopPosition = '2px';
 
     const conversationTimers = new Map();
@@ -40,8 +56,7 @@
         let totalSeconds = Math.floor(elapsedTime / 1000);
         let minutes = Math.floor(totalSeconds / 60);
         let seconds = totalSeconds % 60;
-        let milliseconds = elapsedTime % 1000;
-        timerDiv.textContent = `${formatTime(minutes)}:${formatTime(seconds)}.${formatMilliseconds(milliseconds)}`;
+        timerDiv.textContent = `${formatTime(minutes)}:${formatTime(seconds)}`;
     }
 
     function pauseTimer(conversationEl) {
@@ -50,21 +65,25 @@
             clearInterval(timerData.timerIntervalId);
             timerData.pausedAt = Date.now();
             timerData.isPaused = true;
-            if (timerData.timerDiv.textContent !== completedText) {
+            if (!timerData.timerDiv.classList.contains('timer-completed')) {
                 timerData.timerDiv.style.backgroundColor = pausedBgColor;
                 timerData.timerDiv.style.color = pausedTextColor;
+                timerData.timerDiv.style.borderColor = pausedBorderColor;
+                timerData.timerDiv.style.boxShadow = pausedBoxShadow;
             }
         }
     }
 
     function resumeTimer(conversationEl) {
         const timerData = conversationTimers.get(conversationEl);
-        if (timerData && timerData.isPaused && timerData.timerDiv.textContent !== completedText) {
+        if (timerData && timerData.isPaused && !timerData.timerDiv.classList.contains('timer-completed')) {
             timerData.startTime += (Date.now() - timerData.pausedAt);
             timerData.isPaused = false;
             timerData.timerIntervalId = setInterval(() => updateIndividualTimer(conversationEl), updateIntervalMs);
             timerData.timerDiv.style.backgroundColor = runningBgColor;
             timerData.timerDiv.style.color = runningTextColor;
+            timerData.timerDiv.style.borderColor = runningBorderColor;
+            timerData.timerDiv.style.boxShadow = runningBoxShadow;
         }
     }
 
@@ -94,6 +113,8 @@
             timerData.timerDiv.style.backgroundColor = completedBgColor;
             timerData.timerDiv.style.color = completedTextColor;
             timerData.timerDiv.style.fontSize = completedFontSize;
+            timerData.timerDiv.style.borderColor = 'transparent';
+            timerData.timerDiv.style.boxShadow = 'none';
             timerData.isPaused = true;
             timerData.timerDiv.classList.add('timer-completed');
 
@@ -102,9 +123,11 @@
             timerData.timerDiv.style.left = 'auto';
             timerData.timerDiv.style.transform = 'translateY(-50%)';
             timerData.timerDiv.style.width = 'fit-content';
-            timerData.timerDiv.style.textAlign = 'left';
+            timerData.timerDiv.style.textAlign = 'center';
+            timerData.timerDiv.style.padding = completedPadding;
+            timerData.timerDiv.style.borderRadius = completedBorderRadius;
 
-            console.log(`Cronômetro da conversa (ID: ${conversationEl.id || 'N/A'}) concluído: INTERAÇÃO CONCLUÍDA.`);
+            console.log(`Cronômetro da conversa (ID: ${conversationEl.id || 'N/A'}) concluído: ✓`);
             return;
         }
         renderTime(timerData.timerDiv, elapsedTime);
@@ -117,27 +140,33 @@
         if (existingTimerDivInDOM || existingNumberDivInDOM) {
             if (conversationTimers.has(conversationEl)) {
                 const existingTimerData = conversationTimers.get(conversationEl);
-                if (existingTimerData.timerDiv.textContent === completedText) {
+                if (existingTimerData.timerDiv.classList.contains('timer-completed')) {
                     clearInterval(existingTimerData.timerIntervalId);
                     existingTimerData.startTime = Date.now();
                     existingTimerData.pausedAt = Date.now();
                     existingTimerData.isPaused = true;
-                    existingTimerData.timerDiv.textContent = '00:00.00';
+                    renderTime(existingTimerData.timerDiv, 0);
                     existingTimerData.timerDiv.style.backgroundColor = pausedBgColor;
                     existingTimerData.timerDiv.style.color = pausedTextColor;
-                    existingTimerData.timerDiv.style.fontSize = '11px';
+                    existingTimerData.timerDiv.style.fontSize = timerFontSize;
+                    existingTimerData.timerDiv.style.borderColor = pausedBorderColor;
+                    existingTimerData.timerDiv.style.boxShadow = pausedBoxShadow;
                     existingTimerData.timerDiv.classList.remove('timer-completed');
+                    existingTimerData.timerDiv.style.padding = timerPadding;
+                    existingTimerData.timerDiv.style.borderRadius = timerBorderRadius;
+
                     existingTimerData.timerDiv.style.top = '50%';
                     existingTimerData.timerDiv.style.right = '5px';
                     existingTimerData.timerDiv.style.left = 'auto';
                     existingTimerData.timerDiv.style.transform = 'translateY(-50%)';
                     existingTimerData.timerDiv.style.width = 'fit-content';
-                    existingTimerData.timerDiv.style.textAlign = 'left';
+                    existingTimerData.timerDiv.style.textAlign = 'center';
+                    existingTimerData.timerDiv.style.minWidth = '45px';
 
                     if (existingTimerData.numberDiv) {
                         existingTimerData.numberDiv.style.display = 'block';
                         existingTimerData.numberDiv.style.top = numberTopPosition;
-                        existingTimerData.numberDiv.style.right = numberRightPosition;
+                        existingTimerData.numberDiv.style.right = numberRightPosition; // Ajustado aqui também
                         existingTimerData.numberDiv.style.left = 'auto';
                         existingTimerData.numberDiv.style.transform = 'none';
                     }
@@ -164,26 +193,30 @@
         timerDiv.style.transform = 'translateY(-50%)';
         timerDiv.style.backgroundColor = pausedBgColor;
         timerDiv.style.color = pausedTextColor;
-        timerDiv.style.padding = '2px 5px';
-        timerDiv.style.borderRadius = '3px';
-        timerDiv.style.fontSize = '11px';
+        timerDiv.style.padding = timerPadding;
+        timerDiv.style.borderRadius = timerBorderRadius;
+        timerDiv.style.fontSize = timerFontSize;
         timerDiv.style.fontFamily = 'monospace';
         timerDiv.style.zIndex = '9999';
         timerDiv.style.width = 'fit-content';
-        timerDiv.style.textAlign = 'left';
+        timerDiv.style.textAlign = 'center';
+        timerDiv.style.border = `1px solid ${pausedBorderColor}`;
+        timerDiv.style.boxShadow = pausedBoxShadow;
+        timerDiv.style.fontWeight = 'bold';
+        timerDiv.style.minWidth = '45px';
         conversationEl.appendChild(timerDiv);
 
         let numberDiv = document.createElement('div');
         numberDiv.className = 'injected-conversation-number';
         numberDiv.style.position = 'absolute';
         numberDiv.style.top = numberTopPosition;
-        numberDiv.style.right = numberRightPosition;
+        numberDiv.style.right = numberRightPosition; // AQUI ESTÁ A ALTERAÇÃO PRINCIPAL
         numberDiv.style.left = 'auto';
         numberDiv.style.transform = 'none';
         numberDiv.style.backgroundColor = numberBgColor;
         numberDiv.style.color = numberTextColor;
-        numberDiv.style.padding = '2px 5px';
-        numberDiv.style.borderRadius = '3px';
+        numberDiv.style.padding = numberPadding;
+        numberDiv.style.borderRadius = numberBorderRadius;
         numberDiv.style.fontSize = numberFontSize;
         numberDiv.style.fontFamily = 'sans-serif';
         numberDiv.style.fontWeight = 'bold';
@@ -191,6 +224,8 @@
         numberDiv.style.width = 'fit-content';
         numberDiv.style.textAlign = 'center';
         numberDiv.style.minWidth = '20px';
+        numberDiv.style.border = `1px solid ${numberBorderColor}`;
+        numberDiv.style.boxShadow = numberBoxShadow;
         numberDiv.style.display = 'block';
         conversationEl.appendChild(numberDiv);
 
@@ -218,14 +253,19 @@
         existingConversations.forEach((conversationEl, index) => {
             const timerData = conversationTimers.get(conversationEl);
             if (timerData && timerData.numberDiv) {
+                // O número deve sempre ser exibido, independentemente do status do timer
                 timerData.numberDiv.textContent = (index + 1).toString();
                 timerData.numberDiv.style.backgroundColor = numberBgColor;
                 timerData.numberDiv.style.color = numberTextColor;
                 timerData.numberDiv.style.fontSize = numberFontSize;
-                timerData.numberDiv.style.display = 'block'; 
+                timerData.numberDiv.style.display = 'block'; // Garante que seja sempre 'block'
+                timerData.numberDiv.style.border = `1px solid ${numberBorderColor}`;
+                timerData.numberDiv.style.boxShadow = numberBoxShadow;
+                timerData.numberDiv.style.right = numberRightPosition; // Garante que a posição seja atualizada também
             }
         });
 
+        // Limpa timers de conversas que não estão mais no DOM
         conversationTimers.forEach((timerData, conversationEl) => {
             if (!document.body.contains(conversationEl)) {
                 if (timerData.numberDiv) {
@@ -241,7 +281,7 @@
         const currentlySelectedConversation = document.querySelector('div.interaction-group.is-selected');
 
         conversationTimers.forEach((timerData, conversationEl) => {
-            if (conversationEl !== currentlySelectedConversation && !timerData.isPaused) {
+            if (conversationEl !== currentlySelectedConversation && !timerData.isPaused && !timerData.timerDiv.classList.contains('timer-completed')) {
                 pauseTimer(conversationEl);
             }
         });
@@ -250,7 +290,9 @@
             if (!conversationTimers.has(currentlySelectedConversation)) {
                 createTimerAndNumberForConversation(currentlySelectedConversation);
             }
-            resumeTimer(currentlySelectedConversation);
+            if (!conversationTimers.get(currentlySelectedConversation).timerDiv.classList.contains('timer-completed')) {
+                 resumeTimer(currentlySelectedConversation);
+            }
             currentActiveConversationEl = currentlySelectedConversation;
         } else {
             currentActiveConversationEl = null;
@@ -258,9 +300,11 @@
     }
 
     // --- Lógica de Inicialização e Eventos ---
+    // Remove quaisquer elementos injetados de uma execução anterior (útil para recarga do script)
     document.querySelectorAll('.injected-conversation-timer, .injected-conversation-number').forEach(el => el.remove());
     conversationTimers.clear();
 
+    // Pequeno atraso para garantir que os elementos iniciais da página estejam carregados
     setTimeout(() => {
         const initialConversationElements = document.querySelectorAll('div.interaction-group');
         if (initialConversationElements.length === 0) {
@@ -269,11 +313,11 @@
             initialConversationElements.forEach(createTimerAndNumberForConversation);
             console.log(`Encontrados ${initialConversationElements.length} conversas existentes ao iniciar.`);
         }
-        updateConversationNumbers();
-        manageActiveTimers();
-    }, 500);
+        updateConversationNumbers(); // Atualiza os números logo no início
+        manageActiveTimers();       // Gerencia o estado dos timers
+    }, 500); // Meio segundo de atraso
 
-    const conversationsListContainer = document.body;
+    const conversationsListContainer = document.body; // Observa o body para detectar mudanças em toda a estrutura
     const observer = new MutationObserver((mutationsList, observer) => {
         let shouldUpdateNumbers = false;
         let shouldManageTimers = false;
@@ -282,12 +326,14 @@
             if (mutation.type === 'childList') {
                 if (mutation.addedNodes.length > 0) {
                     for (const node of mutation.addedNodes) {
-                        if (node.nodeType === 1) {
+                        // Verifica se o nó adicionado é uma conversa ou contém conversas
+                        if (node.nodeType === 1) { // Garante que é um Element
                             if (node.matches('div.interaction-group')) {
                                 createTimerAndNumberForConversation(node);
                                 shouldUpdateNumbers = true;
                                 shouldManageTimers = true;
                             }
+                            // Busca por conversas dentro dos nós adicionados (ex: um grande bloco de HTML foi adicionado)
                             const newConversationElements = node.querySelectorAll('div.interaction-group');
                             newConversationElements.forEach(newConvEl => {
                                 if (!conversationTimers.has(newConvEl)) {
@@ -301,6 +347,7 @@
                 }
                 if (mutation.removedNodes.length > 0) {
                     for (const node of mutation.removedNodes) {
+                        // Remove timers de conversas que foram removidas do DOM
                         if (node.nodeType === 1 && node.matches('div.interaction-group')) {
                             removeTimer(node);
                             shouldUpdateNumbers = true;
@@ -312,11 +359,13 @@
 
             if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
                 const changedElement = mutation.target;
+                // Se a classe de uma conversa mudou (ex: para 'is-selected')
                 if (changedElement.matches('div.interaction-group')) {
                     shouldManageTimers = true;
                 }
             }
         }
+        // Executa as atualizações necessárias apenas uma vez por ciclo de mutação
         if (shouldUpdateNumbers) {
             updateConversationNumbers();
         }
@@ -325,10 +374,12 @@
         }
     });
 
+    // Inicia a observação de mudanças no DOM
     observer.observe(conversationsListContainer, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
 
     console.log("Script de gerenciamento de cronômetros e numeração de conversas injetado. Ativação via classe 'is-selected'.");
 })();
+
 // ==UserScript==
 // @name         Copiar CPF e Interação
 // @namespace    http://tampermonkey.net/
@@ -784,3 +835,4 @@ const cleanup = () => {
     observer.disconnect();
 };
 })();
+
