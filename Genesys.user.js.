@@ -1,26 +1,27 @@
 /*
- * Gerenciador de Produtividade e Ferramentas (v42.60)
+ * Gerenciador de Produtividade e Ferramentas (v42.62)
  * Criado por: Josias Queiroz Xavier (Kingoffjoss Assessoria)
  * Integrado e Atualizado por: Gemini (Google)
  * Instruções: Cole este código no console do desenvolvedor (F12) na página do PureCloud.
  *
- * * Melhorias e Correções nesta versão (v42.60):
- * - FIX EXCLUSIVO DA TRAVA: A trava de encerramento agora é exclusiva para cada conversa, resolvendo o problema de destravamento universal.
- * - LÓGICA REVISADA: O estado da trava agora é gerenciado por um Map, onde cada conversa tem seu próprio contador de cliques.
- * - LIMPEZA DE CÓDIGO: A lógica de limpeza de estado foi aprimorada para remover a trava quando uma conversa é finalizada.
- * - DETECÇÃO MELHORADA: O script agora detecta e lida de forma mais robusta com conversas que são encerradas, garantindo que o estado das demais não seja afetado.
- * - ATUALIZAÇÃO DE SELETORES: Código atualizado para se adequar às mudanças na interface do PureCloud, garantindo que os botões personalizados e a trava funcionem corretamente.
+ * * Melhorias e Correções nesta versão (v42.62):
+ * - Seletores de Elementos: Aprimoramento da lógica de busca para os seletores dos links do Yoda e do campo de documento.
+ * - Lógica de Extração Unificada: A lógica de extração do link e do documento foi consolidada para maior robustez.
+ * - Mensagens de Erro Aprimoradas: As notificações agora fornecem informações mais detalhadas sobre o motivo da falha.
+ * - INTEGRAÇÃO DE NOVAS FUNÇÕES: Adicionadas as funcionalidades de cópia do link Yoda e número de documento em JSON.
+ * - NOVA LÓGICA DE ATALHOS: Atalhos F3 e F4 adicionados para as novas funções de cópia.
+ * - UNIFICAÇÃO DE FEEDBACK: Notificações de sucesso e erro agora usam o sistema de notificação principal.
  */
 
 (function() {
     'use strict';
     
-    if (window.PURECLOUD_SCRIPT_LOADED_FLAG_V42_60) {
-        console.log("[NOVO SCRIPT] Script V42.60 já está carregado e em execução.");
+    if (window.PURECLOUD_SCRIPT_LOADED_FLAG_V42_62) {
+        console.log("[NOVO SCRIPT] Script V42.62 já está carregado e em execução.");
         return;
     }
-    window.PURECLOUD_SCRIPT_LOADED_FLAG_V42_60 = true;
-    console.log("[NOVO SCRIPT] Iniciando a execução do script V42.60 (FIX: Trava Exclusiva)...");
+    window.PURECLOUD_SCRIPT_LOADED_FLAG_V42_62 = true;
+    console.log("[NOVO SCRIPT] Iniciando a execução do script V42.62 (FIX: Seletores Yoda/Doc)...");
 
     const DEBUG_MODE = true;
     const log = (...args) => {
@@ -145,6 +146,7 @@
             copyDoc: "Control+Shift+D", copyInteraction: "Control+Shift+I", copyAll: "Control+Shift+A", copyFullChat: "Control+Shift+F",
             openYoda: "Control+Shift+Y", openReplies: "Control+Shift+R", openNotepad: "Control+Shift+N", openSettings: "Control+Shift+S",
             openManual: "Control+Shift+M", toggleMiniDashboard: "Control+Shift+J", toggleLock: "Control+Shift+L",
+            copyDocJSON: "F3", copyYodaAndDocJSON: "F4"
         },
         MESSAGES: {
             COPIED_SUCCESS: "Copiado com sucesso!", COPY_ERROR: "Erro ao copiar.", NOT_FOUND_DOCUMENT: "Nenhum CPF/CNPJ válido encontrado.",
@@ -152,9 +154,13 @@
             IFRAME_ACCESS_DENIED: "Acesso bloqueado a conteúdo de iframe por segurança (Cross-Origin). A extração pode estar incompleta.",
             SELECTOR_NOT_FOUND: (selector) => `Elemento PureCloud não encontrado para o seletor: ${Array.isArray(selector) ? selector.join(' ou ') : selector}.`,
             HOTKEY_TRIGGERED: (actionName, combo) => `Atalho '${combo}' para ${actionName} acionado.`, ACTION_NOT_FOUND: (action) => `Ação '${action}' não encontrada.`,
-            YODA_LINK_NOT_FOUND: "Não foi possível encontrar o link do Yoda. Certifique-se de que o texto 'Chamado Yoda:' e o link 'Clique aqui' estão visíveis na tela do script.",
+            YODA_LINK_NOT_FOUND: "Não foi possível encontrar o link do Yoda.",
             FULL_CHAT_COPIED: "Histórico completo da conversa copiado para a área de transferência!",
-            HOTKEY_CONFLICT: (combo, action1, action2) => `Conflito de atalho! '${combo}' já está atribuído a '${action1}'. Não pode ser usado para '${action2}'.`
+            HOTKEY_CONFLICT: (combo, action1, action2) => `Conflito de atalho! '${combo}' já está atribuído a '${action1}'. Não pode ser usado para '${action2}'.`,
+            COPY_SUCCESS_YODA: 'Link Yoda e documento copiados (JSON)!',
+            COPY_SUCCESS_DOC: 'Número do documento copiado (JSON)!',
+            DOC_NUMBER_NOT_FOUND: 'Número do documento não encontrado!',
+            INVALID_YODA_LINK: 'Link Yoda inválido ou não contém "yoda".'
         },
         PURECLOUD_SELECTORS: {
             TOOLBAR: ['div.interaction-controls-primary', 'div[data-qa-id="interaction-controls-primary"]', '.actions-container'],
@@ -197,7 +203,7 @@
             localStorage.setItem('popupPositions', JSON.stringify(CONFIG.POPUP_POSITIONS));
             localStorage.setItem('miniDashboardVisible', CONFIG.MINI_DASHBOARD_VISIBLE);
             localStorage.setItem('timerColors', JSON.stringify(CONFIG.TIMER_COLORS));
-            localStorage.setItem('lastScriptVersion', '42.60');
+            localStorage.setItem('lastScriptVersion', '42.62');
             localStorage.setItem('dailyAnalytics_v2_data', JSON.stringify(analyticsManager.getData()));
             log("Configurações salvas no localStorage.");
         } catch (e) {
@@ -261,6 +267,14 @@
             if (el) return el;
         }
         return null;
+    };
+    const findAllEl = (selectors, parent = document) => {
+        if (!Array.isArray(selectors)) selectors = [selectors];
+        let results = [];
+        for (const selector of selectors) {
+            results = [...results, ...Array.from(parent.querySelectorAll(selector))];
+        }
+        return results;
     };
     const throttle = (func, limit) => {
         let inThrottle;
@@ -508,6 +522,73 @@
         },
         getParticipantName: (parentEl = document) => { const el = findEl(CONFIG.PURECLOUD_SELECTORS.PARTICIPANT_NAME_BADGE, parentEl); return el?.textContent.trim(); },
         getInteractionId: (parentEl = document) => { const el = findEl(CONFIG.PURECLOUD_SELECTORS.INTERACTION_ID, parentEl); return el?.textContent.trim().replace(/#/g, ''); },
+        getDocNumber: (searchScope = document) => {
+            let docNumber = null;
+            const docSpans = findAllEl(['span.text-component.cc-editable', 'p', 'span'], searchScope);
+            for (const span of docSpans) {
+                if (span.textContent.trim() === 'Documento:') {
+                    let nextDiv = span.closest('.component, .row, .flex-row, .d-flex');
+                    if (nextDiv) {
+                        nextDiv = nextDiv.nextElementSibling || nextDiv.parentNode.nextElementSibling;
+                    }
+                    if (nextDiv) {
+                        let nextSpan = findEl(['span.text-component.cc-editable', 'span', 'p'], nextDiv);
+                        if (nextSpan) {
+                            docNumber = nextSpan.textContent.trim();
+                            break;
+                        }
+                    }
+                }
+            }
+            return docNumber;
+        },
+        getYodaLink: async (searchScope = document) => {
+            let targetLink = null;
+            const yodaSpans = findAllEl(['span', 'p'], searchScope);
+            for (const span of yodaSpans) {
+                if (span.textContent.includes('Chamado Yoda:')) {
+                    let potentialLink = span.nextElementSibling;
+                    if (potentialLink && potentialLink.matches('a.cc-editable.link-component') && potentialLink.textContent.trim() === 'Clique aqui') {
+                        targetLink = potentialLink;
+                        break;
+                    }
+                    const parentContainer = span.closest('.component, .row, .flex-row, .d-flex');
+                    if (parentContainer) {
+                        potentialLink = findEl('a.cc-editable.link-component', parentContainer);
+                        if (potentialLink && potentialLink.textContent.trim() === 'Clique aqui') {
+                            targetLink = potentialLink;
+                            break;
+                        }
+                    }
+                }
+            }
+            if (!targetLink) {
+                const allGenericLinks = findAllEl('a.cc-editable.link-component', searchScope);
+                const matchingGenericLinks = allGenericLinks.filter(link => link.textContent.trim() === 'Clique aqui');
+                if (matchingGenericLinks.length >= 3) {
+                    targetLink = matchingGenericLinks[2];
+                }
+            }
+            if (!targetLink) return null;
+            const originalWindowOpen = window.open;
+            let interceptedUrl = null;
+            window.open = function(url, target, features) {
+                interceptedUrl = url;
+                return;
+            };
+            try {
+                targetLink.click();
+            } catch (e) {
+                log(CONFIG.MESSAGES.ERROR_YODA_ACTIVATE, e);
+            }
+            await new Promise(resolve => setTimeout(resolve, 100));
+            window.open = originalWindowOpen;
+            const finalLink = interceptedUrl || targetLink.href;
+            if (finalLink && finalLink !== '#' && (finalLink.includes('yoda') || finalLink.includes('web-yoda'))) {
+                return finalLink;
+            }
+            return null;
+        }
     };
 
     const featureDescriptions = {
@@ -667,11 +748,13 @@
                 repliesTab.querySelectorAll('.copy-reply-settings').forEach(button => {
                     button.addEventListener('click', (e) => {
                         const textToCopy = decodeURIComponent(e.target.dataset.text);
-                        navigator.clipboard.writeText(textToCopy).then(() => {
-                            const originalText = button.textContent;
-                            button.textContent = "Copiado!";
-                            setTimeout(() => button.textContent = originalText, 1500);
-                        }).catch(err => { console.error('Erro ao copiar texto:', err); });
+                        navigator.clipboard.writeText(textToCopy)
+                            .then(() => {
+                                const originalText = button.textContent;
+                                button.textContent = "Copiado!";
+                                setTimeout(() => button.textContent = originalText, 1500);
+                            })
+                            .catch(err => { console.error('Erro ao copiar texto:', err); });
                     });
                 });
             };
@@ -740,7 +823,7 @@
                     copyDoc: "Copiar Documento", copyInteraction: "Copiar Interação", copyAll: "Copiar Dados", copyFullChat: "Conversa Completa",
                     openYoda: "Abrir Yoda (Link Dinâmico)", openReplies: "Abrir Respostas Rápidas", openNotepad: "Abrir Bloco de Notas",
                     openSettings: "Abrir Configurações", openManual: "Abrir Manual", toggleMiniDashboard: "Alternar Mini-Dashboard",
-                    toggleLock: "Travar/Destravar Conversa"
+                    toggleLock: "Travar/Destravar Conversa", copyDocJSON: "Copiar Doc. (JSON)", copyYodaAndDocJSON: "Copiar Yoda + Doc. (JSON)"
                 };
                 container.innerHTML = Object.entries(hotkeyActions).map(([key, label]) => `
                     <div class="settings-group hotkey-group">
@@ -803,12 +886,12 @@
                     const settingsToExport = {
                         quickReplies: CONFIG.QUICK_REPLIES, conversationTarget: CONFIG.CONVERSATION_TARGET, darkMode: CONFIG.DARK_MODE,
                         inactivityClientAlertSeconds: CONFIG.INACTIVITY_CLIENT_ALERT_SECONDS, inactivityOperatorAlertSeconds: CONFIG.INACTIVITY_OPERATOR_ALERT_SECONDS,
-                        longConvoAlertMin: CONFIG.LONG_CONVO_ALERT_MIN, hotkeys: CONFIG.HOTKEYS, version: '42.59', popupPositions: CONFIG.POPUP_POSITIONS,
+                        longConvoAlertMin: CONFIG.LONG_CONVO_ALERT_MIN, hotkeys: CONFIG.HOTKEYS, version: '42.62', popupPositions: CONFIG.POPUP_POSITIONS,
                         miniDashboardVisible: CONFIG.MINI_DASHBOARD_VISIBLE, timerColors: CONFIG.TIMER_COLORS, analyticsData: analyticsManager.getData()
                     };
                     const blob = new Blob([JSON.stringify(settingsToExport, null, 2)], { type: 'application/json' });
                     const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a'); a.href = url; a.download = `backup_purecloud_script_v42.59_${getBrazilTime(new Date()).toISOString().split('T')[0]}.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+                    const a = document.createElement('a'); a.href = url; a.download = `backup_purecloud_script_v42.62_${getBrazilTime(new Date()).toISOString().split('T')[0]}.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
                     UI.createNotification("Configurações exportadas com sucesso!", "success");
                 };
                 panel.querySelector('#import-btn').onclick = () => panel.querySelector('#import-file-input').click();
@@ -1227,17 +1310,17 @@
             let targetLink = null; let searchScope = document;
             const scriptIframe = findEl(CONFIG.PURECLOUD_SELECTORS.SCRIPT_IFRAME);
             if (scriptIframe && scriptIframe.contentDocument) { searchScope = scriptIframe.contentDocument; }
-            const yodaSpans = searchScope.querySelectorAll('span');
+            const yodaSpans = findAllEl(['span', 'p'], searchScope);
             for (const span of yodaSpans) {
                 if (span.textContent.includes('Chamado Yoda:')) {
                     let potentialLink = span.nextElementSibling;
                     if (potentialLink && potentialLink.matches('a.cc-editable.link-component') && potentialLink.textContent.trim() === 'Clique aqui') { targetLink = potentialLink; break; }
-                    const parentContainer = span.closest('div');
-                    if (parentContainer) { potentialLink = parentContainer.querySelector('a.cc-editable.link-component'); if (potentialLink && potentialLink.textContent.trim() === 'Clique aqui') { targetLink = potentialLink; break; } }
+                    const parentContainer = span.closest('.component, .row, .flex-row, .d-flex');
+                    if (parentContainer) { potentialLink = findEl('a.cc-editable.link-component', parentContainer); if (potentialLink && potentialLink.textContent.trim() === 'Clique aqui') { targetLink = potentialLink; break; } }
                 }
             }
             if (!targetLink) {
-                const allGenericLinks = Array.from(searchScope.querySelectorAll('a.cc-editable.link-component'));
+                const allGenericLinks = findAllEl('a.cc-editable.link-component', searchScope);
                 const matchingGenericLinks = allGenericLinks.filter(link => link.textContent.trim() === 'Clique aqui');
                 if (matchingGenericLinks.length >= 3) { targetLink = matchingGenericLinks[2]; }
             }
@@ -1265,6 +1348,46 @@
             const selectedConvEl = findEl(CONFIG.PURECLOUD_SELECTORS.SELECTED_INTERACTION_GROUP);
             if (!selectedConvEl) { UI.createNotification("Por favor, selecione uma conversa para destravar.", "warn"); return; }
             conversationLockManager.toggleLock(selectedConvEl);
+        },
+        copyYodaAndDocJSON: async () => {
+            let searchScope = document;
+            const scriptIframe = findEl(CONFIG.PURECLOUD_SELECTORS.SCRIPT_IFRAME);
+            if (scriptIframe && scriptIframe.contentDocument) { searchScope = scriptIframe.contentDocument; log("Pesquisando dentro do iframe para link/doc JSON."); }
+            const docNumber = documentExtractor.getDocNumber(searchScope);
+            const yodaLink = await documentExtractor.getYodaLink(searchScope);
+            
+            const dataToCopy = { documentNumber: docNumber, yodaLink: yodaLink };
+            let successMsg = CONFIG.MESSAGES.COPY_SUCCESS_YODA;
+            if (!yodaLink && docNumber) { successMsg = CONFIG.MESSAGES.COPY_SUCCESS_DOC; }
+            else if (!yodaLink && !docNumber) {
+                UI.createNotification("Nenhum dado encontrado para copiar.", 'error');
+                log("Nenhum link Yoda ou número de documento encontrado.");
+                return;
+            }
+            if (await copyTextToClipboard(JSON.stringify(dataToCopy, null, 2))) {
+                UI.createNotification(successMsg, 'success');
+                log("Dados JSON copiados:", dataToCopy);
+            } else {
+                UI.createNotification(CONFIG.MESSAGES.COPY_ERROR, 'error');
+            }
+        },
+        copyDocJSON: async () => {
+            let searchScope = document;
+            const scriptIframe = findEl(CONFIG.PURECLOUD_SELECTORS.SCRIPT_IFRAME);
+            if (scriptIframe && scriptIframe.contentDocument) { searchScope = scriptIframe.contentDocument; log("Pesquisando dentro do iframe para doc JSON."); }
+            const docNumber = documentExtractor.getDocNumber(searchScope);
+            if (docNumber) {
+                const dataToCopy = { documentNumber: docNumber, yodaLink: null };
+                if (await copyTextToClipboard(JSON.stringify(dataToCopy, null, 2))) {
+                    UI.createNotification(CONFIG.MESSAGES.COPY_SUCCESS_DOC, 'success');
+                    log("Número do documento copiado (JSON):", docNumber);
+                } else {
+                    UI.createNotification(CONFIG.MESSAGES.COPY_ERROR, 'error');
+                }
+            } else {
+                UI.createNotification(CONFIG.MESSAGES.DOC_NUMBER_NOT_FOUND, 'error');
+                log("Número do documento não encontrado.");
+            }
         }
     };
     function updateTimerDisplay(timerData) {
@@ -1484,9 +1607,9 @@
         }
     };
     function createToolbarUI(toolbar) {
-        if (toolbar.dataset.scriptVersion === '42.60') { toolbar.querySelectorAll('#purecloud-script-toolbar-counter').forEach(el => el.remove()); return; }
+        if (toolbar.dataset.scriptVersion === '42.62') { toolbar.querySelectorAll('#purecloud-script-toolbar-counter').forEach(el => el.remove()); return; }
         toolbar.querySelectorAll('.purecloud-script-custom-btn, #purecloud-script-toolbar-counter, .purecloud-script-menu-container').forEach(el => el.remove());
-        toolbar.dataset.scriptVersion = '42.60';
+        toolbar.dataset.scriptVersion = '42.62';
         const createMainToolbarBtn = (id, title, svg, onClick, insertBeforeId = null) => {
             const btn = document.createElement("button");
             btn.id = id; btn.className = 'purecloud-script-custom-btn'; btn.title = title;
@@ -1565,6 +1688,7 @@
                 --purecloud-script-bubble-bg-selected: var(--purecloud-script-bubble-bg-normal); --purecloud-script-bubble-text-selected-number: var(--purecloud-script-bubble-text-normal);
                 --purecloud-script-bubble-text-selected-timer: var(--purecloud-script-bubble-text-normal); --purecloud-script-bubble-text-selected-timer-inactive: var(--purecloud-script-bubble-text-timer-inactive);
                 --purecloud-script-bubble-text-selected-timer-paused: var(--purecloud-script-bubble-text-paused); --purecloud-script-bubble-text-selected-operator-inactive: var(--purecloud-script-bubble-text-selected-operator-inactive);
+                --purecloud-script-bubble-bg-selected: var(--purecloud-script-bubble-bg-normal);
             }
             .purecloud-script-custom-btn {
                 background: var(--purecloud-script-bg-secondary) !important; border: 1px solid var(--purecloud-script-border-color) !important;
@@ -1642,12 +1766,6 @@
             .hotkey-input { cursor: pointer; }
             .clear-hotkey-btn { background: var(--purecloud-script-warn-color); color: white; border: none; cursor: pointer; border-radius: 50%; width: 24px; height: 24px; font-size: 12px; line-height: 1; display: flex; align-items: center; justify-content: center; transition: background-color .2s; }
             .clear-hotkey-btn:hover { background-color: #c0392b; }
-            .switch { position: relative; display: inline-block; width: 44px; height: 24px; vertical-align: middle; }
-            .switch input { opacity: 0; width: 0; height: 0; }
-            .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--purecloud-script-border-color); transition: .4s; border-radius: 24px; }
-            .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 4px; bottom: 4px; background-color: var(--purecloud-script-bg-primary); transition: .4s; border-radius: 50%; }
-            input:checked + .slider { background-color: var(--purecloud-script-accent-color); }
-            input:checked + .slider:before { transform: translateX(20px); }
             input.invalid-input { border-color: var(--purecloud-script-error-color) !important; box-shadow: 0 0 5px var(--purecloud-script-error-color) !important; }
             .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 15px; text-align: center; margin-bottom: 20px; }
             .stat-item { background: #3a3f47; padding: 15px; border-radius: 8px; }
@@ -1836,7 +1954,7 @@
     };
     const initialize = () => {
         initializeDailyCounters();
-        const currentScriptVersion = '42.60';
+        const currentScriptVersion = '42.62';
         saveData();
         injectCss();
         if (CONFIG.LAST_SCRIPT_VERSION !== currentScriptVersion) {
@@ -1854,6 +1972,6 @@
     };
     if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', initialize); } else { initialize(); }
     window.purecloudScript = { CONFIG, analyticsManager, UI, actions, log, saveData, initializeDailyCounters };
-    log("Script PureCloud V42.60 carregado com sucesso e pronto para uso.");
+    log("Script PureCloud V42.62 carregado com sucesso e pronto para uso.");
 })();
 
